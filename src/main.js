@@ -20,7 +20,7 @@ function encodeIntoUrl(method, params) {
 function post(method, params) {
   var response = UrlFetchApp.fetch(encodeIntoUrl(method, params));
   console.info(response.getContentText());
-  return response;
+  return response.getContentText();
 }
 
 function setWebhook() {
@@ -37,7 +37,6 @@ function resetWebhook() {
 }
 
 function createSheet(poll) {
-  Logger.log(poll);
   var sheet = SpreadsheetApp.openById(spreadsheetId).insertSheet(poll.id);
   sheet.appendRow([poll.question]);
   headers = ['Name'];
@@ -59,7 +58,6 @@ function getSheet(sheetName) {
  * Creates a new row with data_array if such a row is not found.
  */
 function updateRow(sheet, data_array) {
-  var data = sheet.getDataRange().getValues();
   var lastRow = sheet.getLastRow();
   for (var i = ID_TO_NAME_START_COORDS[0]; i <= lastRow; i++) {
     if (sheet.getRange(i, ID_TO_NAME_START_COORDS[1]).getValue() == data_array[0]) {
@@ -69,7 +67,7 @@ function updateRow(sheet, data_array) {
       return;
     }
   }
-  sheet.getRange(lastRow + 1, 1, 1, data_array.length).setValues([data_array]);
+  sheet.getRange(lastRow + 1, ID_TO_NAME_START_COORDS[0], ID_TO_NAME_START_COORDS[1], data_array.length).setValues([data_array]);
 }
 
 function updateSheetWithName(message) {
@@ -99,7 +97,7 @@ function getName(telegramId) {
 function formatOptionsIntoSpreadSheetRow(name, option_ids, num_options) {
   var row = [name];
   for (var i = 0; i < num_options; i++) {
-    if (i in option_ids) {
+    if (option_ids.includes(i)) {
       row.push(1);
     } else {
       row.push("");
@@ -121,7 +119,7 @@ function sendText(id, text) {
 }
 
 function sendPoll(id, poll) {
-  post("sendPoll",
+  return post("sendPoll",
     {
       "chat_id": id,
       "question": poll.question,
@@ -140,15 +138,16 @@ function doPost(e) {
       if (message.text.includes("/name")) {
         var result = updateSheetWithName(message);
         sendText(chat_id, "Successfully updated telegram user with id '" + result[0] + "' with name '" + result[1] + "'");
-      } else {
-      sendText(chat_id, "echo: " + message.text);
       }
     } else if ("poll" in message) {
-      sendPoll(chat_id, message.poll);
-      createSheet(message.poll);
-    } else if ("poll_answer" in contents) {
-      updateSheetWithPoll(contents.poll_answer);
+      var response = sendPoll(chat_id, message.poll);
+      var result = JSON.parse(response).result;
+      createSheet(result.poll);
     }
   }
+  if ("poll_answer" in contents) {
+    updateSheetWithPoll(contents.poll_answer);
+  }
 }
+
 
